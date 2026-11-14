@@ -10,6 +10,7 @@ import { randomInt, randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { Donation, PickupVerification, Report, User } from './models.js';
+import { VALID_ROLES, isValidRole } from './roles.js';
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -109,7 +110,7 @@ app.post('/api/auth/register', requireDatabase, async (request, response, next) 
   try {
     const { name, organization, email, password, role } = request.body;
     if (!name || !email || !password || password.length < 8) return response.status(400).json({ message: 'Name, email, and a password of at least 8 characters are required.' });
-    if (!['donor', 'ngo'].includes(role)) return response.status(400).json({ message: 'Choose a valid account type.' });
+    if (!isValidRole(role)) return response.status(400).json({ message: 'Choose a valid account type.' });
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await User.create({ name, organization, email, passwordHash, role });
     response.status(201).json({ token: makeToken(user), user: serializeUser(user) });
@@ -165,7 +166,7 @@ app.post('/api/donations', requireDatabase, authenticate, allowRoles('donor', 'a
   } catch (error) { next(error); }
 });
 
-app.patch('/api/donations/:id/claim', requireDatabase, authenticate, allowRoles('ngo'), async (request, response, next) => {
+app.patch('/api/donations/:id/claim', requireDatabase, authenticate, allowRoles('ngo', 'volunteer'), async (request, response, next) => {
   try {
     const donation = await Donation.findOneAndUpdate(
       { _id: request.params.id, status: 'available', expiresAt: { $gt: new Date() } },
@@ -199,7 +200,7 @@ app.post('/api/donations/:id/pickup-code', requireDatabase, authenticate, allowR
   } catch (error) { next(error); }
 });
 
-app.patch('/api/donations/:id/verify-pickup', requireDatabase, authenticate, allowRoles('ngo'), async (request, response, next) => {
+app.patch('/api/donations/:id/verify-pickup', requireDatabase, authenticate, allowRoles('ngo', 'volunteer'), async (request, response, next) => {
   try {
     const donation = await Donation.findOne({ _id: request.params.id, claimedBy: request.user.id, status: 'claimed' });
     if (!donation) return response.status(404).json({ message: 'No active pickup was found for this account.' });
