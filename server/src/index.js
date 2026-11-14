@@ -181,7 +181,7 @@ app.patch('/api/donations/:id/claim', requireDatabase, authenticate, allowRoles(
       { otpHash, expiresAt: donation.expiresAt, verifiedAt: null },
       { upsert: true, new: true, setDefaultsOnInsert: true },
     );
-    response.json({ donation: serializeDonation(donation) });
+    response.json({ donation: serializeDonation(donation, pickupCode) });
   } catch (error) { next(error); }
 });
 
