@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Classifier</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>Image Classifier</h1>
+      <p class="subtitle">Upload an image and classify it with MobileNetV2.</p>
+
+      <form action="/predict" method="post" enctype="multipart/form-data">
+        <label for="file" class="upload-label">Choose image</label>
+        <input type="file" id="file" name="file" accept="image/*" required />
+        <button type="submit">Classify</button>
+      </form>
+
+      {% if error %}
+      <div class="message error">
+        <p>{{ error }}</p>
+      </div>
+      {% endif %}
+
+      {% if uploaded_image %}
+      <div class="result-grid">
+        <div class="image-panel">
+          <img src="{{ uploaded_image }}" alt="Uploaded prediction input" />
+        </div>
+
+        <div class="result-panel">
+          <h2>Prediction</h2>
+          <p class="label">{{ label }}</p>
+          <p class="confidence">Confidence: {{ confidence }}%</p>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </body>
+</html>
+
