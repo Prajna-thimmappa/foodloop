@@ -1,7 +1,11 @@
-const fs = require('node:fs');
-const path = require('node:path');
-const { DatabaseSync } = require('node:sqlite');
-const { donations: seedDonations, reports: seedReports, impactSummary: seedImpactSummary } = require('./data');
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { DatabaseSync } from 'node:sqlite';
+import { donations as seedDonations, reports as seedReports, impactSummary as seedImpactSummary } from './data.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const databasePath = process.env.FOODLOOP_DB_PATH
   ? path.resolve(process.env.FOODLOOP_DB_PATH)
@@ -73,57 +77,59 @@ database.prepare('INSERT OR IGNORE INTO app_state (key, value) VALUES (?, ?)')
 
 const parseRows = (rows) => rows.map((row) => JSON.parse(row.payload));
 
-const getDonations = () => parseRows(
+export const getDonations = () => parseRows(
   database.prepare('SELECT payload FROM donations ORDER BY rowid DESC').all(),
 );
 
-const findDonation = (id) => {
+export const findDonation = (id) => {
   const row = database.prepare('SELECT payload FROM donations WHERE id = ?').get(id);
   return row ? JSON.parse(row.payload) : undefined;
 };
 
-const saveDonation = (donation) => {
+export const saveDonation = (donation) => {
   database.prepare(`
     INSERT INTO donations (id, payload) VALUES (?, ?)
     ON CONFLICT(id) DO UPDATE SET payload = excluded.payload
   `).run(donation.id, JSON.stringify(donation));
 };
 
-const getReports = () => parseRows(
+export const getReports = () => parseRows(
   database.prepare('SELECT payload FROM reports ORDER BY rowid DESC').all(),
 );
 
-const saveReport = (report) => {
+export const saveReport = (report) => {
   database.prepare('INSERT INTO reports (id, payload) VALUES (?, ?)')
     .run(report.id, JSON.stringify(report));
 };
 
-const getImpactSummary = () => {
+export const getImpactSummary = () => {
   const row = database.prepare('SELECT value FROM app_state WHERE key = ?').get('impactSummary');
   return JSON.parse(row.value);
 };
 
-const saveImpactSummary = (summary) => {
+export const saveImpactSummary = (summary) => {
   database.prepare(`
     INSERT INTO app_state (key, value) VALUES (?, ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value
   `).run('impactSummary', JSON.stringify(summary));
 };
 
-const findUserByEmail = (email) => {
+export const findUserByEmail = (email) => {
   const row = database.prepare(`
     SELECT id, email, password_hash, profile FROM users WHERE email = ? COLLATE NOCASE
   `).get(email);
   return row ? { ...JSON.parse(row.profile), passwordHash: row.password_hash } : undefined;
 };
 
-const createUser = ({ id, email, passwordHash, profile }) => {
+export const createUser = ({ id, email, passwordHash, profile }) => {
   database.prepare(`
     INSERT INTO users (id, email, password_hash, profile) VALUES (?, ?, ?, ?)
   `).run(id, email, passwordHash, JSON.stringify(profile));
 };
 
-const createSession = (tokenHash, userId, expiresAt) => {
+export const listUsers = () => database.prepare('SELECT profile FROM users ORDER BY rowid DESC').all().map(({ profile }) => JSON.parse(profile));
+
+export const createSession = (tokenHash, userId, expiresAt) => {
   const now = Date.now();
   database.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(now);
   database.prepare(`
@@ -131,7 +137,7 @@ const createSession = (tokenHash, userId, expiresAt) => {
   `).run(tokenHash, userId, expiresAt, now);
 };
 
-const findUserBySessionTokenHash = (tokenHash) => {
+export const findUserBySessionTokenHash = (tokenHash) => {
   const row = database.prepare(`
     SELECT users.profile
     FROM sessions
@@ -141,21 +147,6 @@ const findUserBySessionTokenHash = (tokenHash) => {
   return row ? JSON.parse(row.profile) : undefined;
 };
 
-const deleteSession = (tokenHash) => {
+export const deleteSession = (tokenHash) => {
   database.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash);
-};
-
-module.exports = {
-  getDonations,
-  findDonation,
-  saveDonation,
-  getReports,
-  saveReport,
-  getImpactSummary,
-  saveImpactSummary,
-  findUserByEmail,
-  createUser,
-  createSession,
-  findUserBySessionTokenHash,
-  deleteSession,
 };

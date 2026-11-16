@@ -1,4 +1,4 @@
-const user = {
+export const user = {
   id: 'guest-user',
   name: 'Guest',
   role: 'ngo',
@@ -11,7 +11,7 @@ const user = {
   notifications: 3,
 };
 
-const donations = [
+export const donations = [
   {
     id: 'don-1',
     name: 'Warm bowls, warm hearts',
@@ -60,11 +60,11 @@ const donations = [
   },
 ];
 
-const reports = [
+export const reports = [
   { id: 'report-1', donationId: 'don-1', reason: 'Late pickup', status: 'open' },
 ];
 
-const impactSummary = {
+export const impactSummary = {
   redirectedMeals: 0,
   availableListings: donations.filter((item) => item.status === 'available').length,
   activePartners: 36,
@@ -72,9 +72,4 @@ const impactSummary = {
   monthlyProgress: 12.8,
 };
 
-module.exports = {
-  user,
-  donations,
-  reports,
-  impactSummary,
-};
+export default { user, donations, reports, impactSummary };

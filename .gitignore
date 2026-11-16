@@ -3,4 +3,5 @@ dist/
 .env
 server/uploads/*
 !server/uploads/.gitkeep
+server/data/*.sqlite
 npm-debug.log*
