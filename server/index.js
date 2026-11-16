@@ -274,7 +274,7 @@ app.post('/api/auth/register', async (req, res) => {
   const password = String(payload.password || '');
   const name = String(payload.name || '').trim();
   const organization = String(payload.organization || '').trim();
-  const allowedRoles = new Set(['ngo', 'volunteer', 'donor']);
+  const allowedRoles = new Set(['ngo', 'volunteer', 'donor', 'admin']);
   const emailIsValid = email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   if (!emailIsValid || password.length < 8 || password.length > 128 || !name || name.length > 80 || organization.length > 120 || !allowedRoles.has(payload.role)) {

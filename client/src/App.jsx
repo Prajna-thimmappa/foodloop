@@ -116,6 +116,24 @@ function App() {
     setToast(message);
   }
 
+  async function logout() {
+    const token = localStorage.getItem('foodloop-token');
+    if (token) {
+      try {
+        await axios.post('/api/auth/logout', {}, { timeout: 2500 });
+      } catch {
+        // Ignore logout errors and fall back to local sign-out state.
+      }
+    }
+
+    localStorage.removeItem('foodloop-token');
+    delete axios.defaults.headers.common.Authorization;
+    setUser(null);
+    setModal({ type: 'auth' });
+    setActivePage('overview');
+    announce('Signed out.');
+  }
+
   async function claimDonation(donation) {
     try {
       const { data } = await axios.patch(`/api/donations/${donation.id}/claim`, {}, { timeout: 2500 });
@@ -233,6 +251,7 @@ function App() {
             <span className="profile-copy"><strong>{currentUser.name}</strong><small>Manage profile</small></span>
             <ChevronDown size={15} className="muted-icon" />
           </button>
+          <button className="text-action" onClick={logout}>Sign out</button>
         </div>
       </aside>
 
@@ -431,7 +450,7 @@ function AuthModal({ user, onClose, onSubmit }) {
     formData.role = role;
     onSubmit(formData);
   }
-  return <Modal title={mode === 'login' ? 'Welcome back' : 'Join the neighborhood'} subtitle="Be part of a kinder, less wasteful food system." onClose={onClose}><form className="modal-form auth-form" onSubmit={submit}>{mode === 'register' && <><label>Your name<input name="name" placeholder="Name" required /></label><label>Organization<input name="organization" placeholder="Kitchen, NGO, or community group" /></label><div className="role-picker"><span>I’m here as a</span>{[['ngo', 'NGO'], ['volunteer', 'Volunteer'], ['donor', 'Food donor']].map(([value, label]) => <button type="button" key={value} className={role === value ? 'role-selected' : ''} onClick={() => setRole(value)}>{label}</button>)}</div></>}<label>Email address<input name="email" type="email" placeholder="you@example.org" required /></label><label>Password<input name="password" type="password" placeholder="At least 8 characters" minLength="8" required /></label><button type="submit" className="offer-button full-button">{mode === 'login' ? 'Log in' : 'Create account'} <ArrowRight size={16} /></button><p className="auth-switch">{mode === 'login' ? 'New to FoodLoop?' : 'Already part of the loop?'} <button type="button" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>{mode === 'login' ? 'Create an account' : 'Log in'}</button></p></form></Modal>;
+  return <Modal title={mode === 'login' ? 'Welcome back' : 'Join the neighborhood'} subtitle="Be part of a kinder, less wasteful food system." onClose={onClose}><form className="modal-form auth-form" onSubmit={submit}>{mode === 'register' && <><label>Your name<input name="name" placeholder="Name" required /></label><label>Organization<input name="organization" placeholder="Kitchen, NGO, or community group" /></label><div className="role-picker"><span>I’m here as a</span>{[['ngo', 'NGO'], ['volunteer', 'Volunteer'], ['donor', 'Food donor'], ['admin', 'Admin']].map(([value, label]) => <button type="button" key={value} className={role === value ? 'role-selected' : ''} onClick={() => setRole(value)}>{label}</button>)}</div></>}<label>Email address<input name="email" type="email" placeholder="you@example.org" required /></label><label>Password<input name="password" type="password" placeholder="At least 8 characters" minLength="8" required /></label><button type="submit" className="offer-button full-button">{mode === 'login' ? 'Log in' : 'Create account'} <ArrowRight size={16} /></button><p className="auth-switch">{mode === 'login' ? 'New to FoodLoop?' : 'Already part of the loop?'} <button type="button" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>{mode === 'login' ? 'Create an account' : 'Log in'}</button></p></form></Modal>;
 }
 
 function DetailsModal({ donation, onClose, onClaim, onReport }) {

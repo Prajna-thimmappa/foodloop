@@ -9,6 +9,7 @@ import path from 'node:path';
 import { randomInt, randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Donation, PickupVerification, Report, User } from './models.js';
 import { VALID_ROLES, isValidRole } from './roles.js';
 
@@ -18,6 +19,7 @@ const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 const jwtSecret = process.env.JWT_SECRET || 'local-development-secret-change-me';
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDirectory = path.resolve(currentDirectory, '../uploads');
+let mongoMemoryServer;
 
 app.use(cors({ origin: clientOrigin, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
@@ -245,12 +247,130 @@ app.use((error, _request, response, _next) => {
   response.status(500).json({ message: 'Something went wrong. Please try again.' });
 });
 
+async function connectDatabase() {
+  if (process.env.MONGODB_URI) {
+    try {
+      await mongoose.connect(process.env.MONGODB_URI);
+      console.log('MongoDB connected');
+      return;
+    } catch (error) {
+      console.warn(`MongoDB connection failed for ${process.env.MONGODB_URI}: ${error.message}. Falling back to in-memory database.`);
+    }
+  }
+
+  mongoMemoryServer = await MongoMemoryServer.create();
+  await mongoose.connect(mongoMemoryServer.getUri());
+  console.log('MongoDB connected to in-memory database for local development');
+}
+
+async function seedDatabase() {
+  const donorEmail = 'donor@foodloop.org';
+  const volunteerEmail = 'volunteer@foodloop.org';
+  const adminEmail = 'admin@foodloop.org';
+
+  const [donor, volunteer, admin] = await Promise.all([
+    User.findOne({ email: donorEmail }),
+    User.findOne({ email: volunteerEmail }),
+    User.findOne({ email: adminEmail }),
+  ]);
+
+  if (!donor) {
+    await User.create({
+      name: 'Asha Patel',
+      organization: 'Amma Kitchen',
+      email: donorEmail,
+      passwordHash: await bcrypt.hash('password123', 12),
+      role: 'donor',
+    });
+  }
+
+  if (!volunteer) {
+    await User.create({
+      name: 'Leah Kim',
+      organization: 'Community Table',
+      email: volunteerEmail,
+      passwordHash: await bcrypt.hash('password123', 12),
+      role: 'volunteer',
+    });
+  }
+
+  if (!admin) {
+    await User.create({
+      name: 'FoodLoop Admin',
+      organization: 'FoodLoop',
+      email: adminEmail,
+      passwordHash: await bcrypt.hash('password123', 12),
+      role: 'admin',
+    });
+  }
+
+  const donationCount = await Donation.countDocuments();
+  if (donationCount > 0) return;
+
+  const seededDonor = await User.findOne({ email: donorEmail });
+  const seededVolunteer = await User.findOne({ email: volunteerEmail });
+  const now = new Date();
+
+  await Donation.insertMany([
+    {
+      name: 'Warm bowls, warm hearts',
+      category: 'Prepared meals',
+      description: 'Fresh lentil stew, rice, and seasonal vegetables prepared for pickup.',
+      quantity: '12 meals',
+      servings: 12,
+      location: 'The Community Table',
+      image: 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=960&q=80',
+      dietary: 'Vegetarian',
+      expiresAt: new Date(now.getTime() + 4 * 60 * 60 * 1000),
+      status: 'claimed',
+      donor: seededDonor._id,
+      claimedBy: seededVolunteer._id,
+      claimedAt: now,
+      collectedAt: null,
+    },
+    {
+      name: 'Farm-fresh produce box',
+      category: 'Produce',
+      description: 'A mix of greens, tomatoes, and citrus from the morning harvest.',
+      quantity: '8 boxes',
+      servings: 8,
+      location: 'Green Loop Market',
+      image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=960&q=80',
+      dietary: 'Seasonal',
+      expiresAt: new Date(now.getTime() + 18 * 60 * 60 * 1000),
+      status: 'available',
+      donor: seededDonor._id,
+      claimedBy: null,
+      claimedAt: null,
+      collectedAt: null,
+    },
+    {
+      name: 'Fresh bakery bundle',
+      category: 'Bakery',
+      description: 'Freshly baked breads and pastries ready for a community handoff.',
+      quantity: '18 items',
+      servings: 18,
+      location: 'RT Nagar',
+      image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=960&q=80',
+      dietary: 'Contains gluten',
+      expiresAt: new Date(now.getTime() + 8 * 60 * 60 * 1000),
+      status: 'available',
+      donor: seededDonor._id,
+      claimedBy: null,
+      claimedAt: null,
+      collectedAt: null,
+    },
+  ]);
+}
+
 await mkdir(uploadsDirectory, { recursive: true });
 
-if (process.env.MONGODB_URI) {
-  mongoose.connect(process.env.MONGODB_URI)
-    .then(() => console.log('MongoDB connected'))
-    .catch((error) => console.error(`MongoDB connection failed: ${error.message}`));
+try {
+  await connectDatabase();
+  await seedDatabase();
+} catch (error) {
+  console.error(`Database setup failed: ${error.message}`);
+  process.exit(1);
 }
 
 app.listen(port, () => console.log(`FoodLoop API listening on http://localhost:${port}`));
