@@ -26,6 +26,11 @@ import {
   X,
 } from 'lucide-react';
 
+const apiBaseUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
+if (apiBaseUrl) {
+  axios.defaults.baseURL = apiBaseUrl;
+}
+
 const navItems = [
   { id: 'overview', label: 'Overview', icon: Compass },
   { id: 'marketplace', label: 'Find food', icon: Search },
