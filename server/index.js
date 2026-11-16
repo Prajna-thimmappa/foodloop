@@ -30,9 +30,17 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const sessionLifetimeMs = 7 * 24 * 60 * 60 * 1000;
 
+app.disable('x-powered-by');
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
+app.use('/api/auth', require('express-rate-limit')({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many attempts. Please try again in a few minutes.' },
+}));
 
 const buildUserResponse = (overrides = {}) => ({
   ...user,
@@ -275,9 +283,10 @@ app.post('/api/auth/register', async (req, res) => {
   const name = String(payload.name || '').trim();
   const organization = String(payload.organization || '').trim();
   const allowedRoles = new Set(['ngo', 'volunteer', 'donor', 'admin']);
+  const normalizedRole = String(payload.role || '').trim().toLowerCase();
   const emailIsValid = email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  if (!emailIsValid || password.length < 8 || password.length > 128 || !name || name.length > 80 || organization.length > 120 || !allowedRoles.has(payload.role)) {
+  if (!emailIsValid || password.length < 8 || password.length > 128 || !name || name.length > 80 || organization.length > 120 || !allowedRoles.has(normalizedRole)) {
     return res.status(400).json({
       message: 'Provide a valid email, a name, a supported account type, and a password of 8 to 128 characters.',
     });

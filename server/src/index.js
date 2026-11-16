@@ -1,29 +1,47 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import path from 'node:path';
 import { randomInt, randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Donation, PickupVerification, Report, User } from './models.js';
-import { VALID_ROLES, isValidRole } from './roles.js';
+import { VALID_ROLES, isRegistrationRole, normalizeEmail, normalizeRole } from './roles.js';
 
 const app = express();
+const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(currentDirectory, '../.env') });
+
 const port = process.env.PORT || 5000;
 const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
-const jwtSecret = process.env.JWT_SECRET || 'local-development-secret-change-me';
-const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
+const isProduction = process.env.NODE_ENV === 'production';
+const jwtSecret = process.env.JWT_SECRET || (isProduction ? '' : 'local-development-secret-change-me');
+if (isProduction && jwtSecret.length < 32) throw new Error('Set JWT_SECRET to a random value of at least 32 characters in production.');
 const uploadsDirectory = path.resolve(currentDirectory, '../uploads');
 let mongoMemoryServer;
 
+app.disable('x-powered-by');
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+  contentSecurityPolicy: false,
+}));
 app.use(cors({ origin: clientOrigin, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 app.use('/uploads', express.static(uploadsDirectory));
+app.use('/api/auth', rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { message: 'Too many attempts. Please try again in a few minutes.' },
+}));
 
 const storage = multer.diskStorage({
   destination: (_request, _file, callback) => callback(null, uploadsDirectory),
@@ -54,7 +72,8 @@ async function authenticate(request, response, next) {
   try {
     const payload = jwt.verify(token, jwtSecret);
     request.user = await User.findById(payload.sub).select('-passwordHash');
-    if (!request.user) return response.status(401).json({ message: 'Your account could not be found.' });
+    if (!request.user || !request.user.role) return response.status(401).json({ message: 'Your account could not be found.' });
+    if (Number(payload.ver || 0) !== Number(request.user.tokenVersion || 0)) return response.status(401).json({ message: 'Your session has expired. Please sign in again.' });
     next();
   } catch {
     response.status(401).json({ message: 'Your session has expired. Please sign in again.' });
@@ -63,13 +82,15 @@ async function authenticate(request, response, next) {
 
 function allowRoles(...roles) {
   return (request, response, next) => {
-    if (!roles.includes(request.user.role)) return response.status(403).json({ message: 'You do not have permission to do that.' });
+    if (!request.user || !request.user.role) return response.status(401).json({ message: 'Please sign in to continue.' });
+    const normalizedRoles = roles.map((role) => normalizeRole(role));
+    if (!normalizedRoles.includes(normalizeRole(request.user.role))) return response.status(403).json({ message: 'You do not have permission to do that.' });
     next();
   };
 }
 
 function makeToken(user) {
-  return jwt.sign({ sub: user.id, role: user.role }, jwtSecret, { expiresIn: '7d' });
+  return jwt.sign({ sub: user.id, role: user.role, ver: user.tokenVersion || 0 }, jwtSecret, { expiresIn: '7d' });
 }
 
 function serializeUser(user) {
@@ -110,11 +131,17 @@ app.get('/api/health', (_request, response) => {
 
 app.post('/api/auth/register', requireDatabase, async (request, response, next) => {
   try {
-    const { name, organization, email, password, role } = request.body;
+    const name = String(request.body?.name || '').trim();
+    const organization = String(request.body?.organization || '').trim();
+    const email = normalizeEmail(request.body?.email);
+    const password = String(request.body?.password || '');
+    const role = normalizeRole(request.body?.role);
+
     if (!name || !email || !password || password.length < 8) return response.status(400).json({ message: 'Name, email, and a password of at least 8 characters are required.' });
-    if (!isValidRole(role)) return response.status(400).json({ message: 'Choose a valid account type.' });
+    if (name.length > 80 || organization.length > 120 || password.length > 128 || !isRegistrationRole(role)) return response.status(400).json({ message: 'Choose a valid account type and use a valid name and password.' });
+
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = await User.create({ name, organization, email, passwordHash, role });
+    const user = await User.create({ name, organization: organization || name, email, passwordHash, role });
     response.status(201).json({ token: makeToken(user), user: serializeUser(user) });
   } catch (error) {
     if (error.code === 11000) return response.status(409).json({ message: 'An account with that email already exists.' });
@@ -123,10 +150,21 @@ app.post('/api/auth/register', requireDatabase, async (request, response, next) 
 });
 
 app.post('/api/auth/login', requireDatabase, async (request, response) => {
-  const { email, password } = request.body;
-  const user = await User.findOne({ email: String(email || '').toLowerCase() });
-  if (!user || !(await bcrypt.compare(password || '', user.passwordHash))) return response.status(401).json({ message: 'Email or password is incorrect.' });
+  const email = normalizeEmail(request.body?.email);
+  const password = String(request.body?.password || '');
+
+  if (!email || !password || password.length > 128) return response.status(400).json({ message: 'Email and password are required.' });
+
+  const user = await User.findOne({ email });
+  if (!user || !(await bcrypt.compare(password, user.passwordHash))) return response.status(401).json({ message: 'Email or password is incorrect.' });
   response.json({ token: makeToken(user), user: serializeUser(user) });
+});
+
+app.post('/api/auth/logout', requireDatabase, authenticate, async (request, response, next) => {
+  try {
+    await User.updateOne({ _id: request.user.id }, { $inc: { tokenVersion: 1 } });
+    response.json({ status: 'ok' });
+  } catch (error) { next(error); }
 });
 
 app.post('/api/uploads', requireDatabase, authenticate, upload.single('image'), (request, response) => {
@@ -157,6 +195,20 @@ app.get('/api/donations/mine', requireDatabase, authenticate, allowRoles('donor'
   } catch (error) { next(error); }
 });
 
+app.get('/api/donations/pickups', requireDatabase, authenticate, allowRoles('ngo', 'volunteer'), async (request, response, next) => {
+  try {
+    const donations = await Donation.find({
+      claimedBy: request.user.id,
+      status: { $in: ['claimed', 'collected'] },
+    })
+      .populate('donor', 'name organization')
+      .populate('claimedBy', 'name organization')
+      .sort({ claimedAt: -1 })
+      .limit(100);
+    response.json({ donations: donations.map((item) => serializeDonation(item)) });
+  } catch (error) { next(error); }
+});
+
 app.post('/api/donations', requireDatabase, authenticate, allowRoles('donor', 'admin'), async (request, response, next) => {
   try {
     const { name, category, description, quantity, location, expiresAt, image, dietary } = request.body;
@@ -176,14 +228,7 @@ app.patch('/api/donations/:id/claim', requireDatabase, authenticate, allowRoles(
       { new: true },
     ).populate('donor', 'name organization').populate('claimedBy', 'name');
     if (!donation) return response.status(409).json({ message: 'This listing is no longer available.' });
-    const pickupCode = String(randomInt(100000, 1000000));
-    const otpHash = await bcrypt.hash(pickupCode, 10);
-    await PickupVerification.findOneAndUpdate(
-      { donation: donation.id },
-      { otpHash, expiresAt: donation.expiresAt, verifiedAt: null },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
-    );
-    response.json({ donation: serializeDonation(donation, pickupCode) });
+    response.json({ donation: serializeDonation(donation) });
   } catch (error) { next(error); }
 });
 
@@ -226,6 +271,23 @@ app.post('/api/reports', requireDatabase, authenticate, async (request, response
   } catch (error) { next(error); }
 });
 
+app.get('/api/community/stats', requireDatabase, async (_request, response, next) => {
+  try {
+    const [totals, partners] = await Promise.all([
+      Donation.aggregate([
+        { $match: { status: 'collected' } },
+        { $group: { _id: null, mealsRedirected: { $sum: '$servings' }, completedPickups: { $sum: 1 } } },
+      ]),
+      User.countDocuments({ role: { $in: ['donor', 'ngo', 'volunteer'] } }),
+    ]);
+    response.json({
+      mealsRedirected: totals[0]?.mealsRedirected || 0,
+      completedPickups: totals[0]?.completedPickups || 0,
+      partners,
+    });
+  } catch (error) { next(error); }
+});
+
 app.get('/api/admin/stats', requireDatabase, authenticate, allowRoles('admin'), async (_request, response) => {
   const [users, donors, ngos, available, claimed, collected, reports] = await Promise.all([
     User.countDocuments(), User.countDocuments({ role: 'donor' }), User.countDocuments({ role: 'ngo' }),
@@ -248,15 +310,19 @@ app.use((error, _request, response, _next) => {
 });
 
 async function connectDatabase() {
-  if (process.env.MONGODB_URI) {
+  const mongoUri = process.env.MONGODB_URI?.trim();
+  if (mongoUri) {
     try {
-      await mongoose.connect(process.env.MONGODB_URI);
+      await mongoose.connect(mongoUri);
       console.log('MongoDB connected');
       return;
     } catch (error) {
-      console.warn(`MongoDB connection failed for ${process.env.MONGODB_URI}: ${error.message}. Falling back to in-memory database.`);
+      if (isProduction) throw new Error('MongoDB connection failed. Check MONGODB_URI and database network access.');
+      console.warn(`MongoDB connection failed: ${error.message}. Falling back to in-memory database for local development.`);
     }
   }
+
+  if (isProduction) throw new Error('MONGODB_URI is required in production; refusing to start with temporary storage.');
 
   mongoMemoryServer = await MongoMemoryServer.create();
   await mongoose.connect(mongoMemoryServer.getUri());
@@ -367,7 +433,7 @@ await mkdir(uploadsDirectory, { recursive: true });
 
 try {
   await connectDatabase();
-  await seedDatabase();
+  if (!isProduction) await seedDatabase();
 } catch (error) {
   console.error(`Database setup failed: ${error.message}`);
   process.exit(1);

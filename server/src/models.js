@@ -6,6 +6,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   passwordHash: { type: String, required: true },
   role: { type: String, enum: ['donor', 'ngo', 'volunteer', 'admin'], default: 'ngo' },
+  tokenVersion: { type: Number, default: 0, min: 0 },
 }, { timestamps: true });
 
 const donationSchema = new mongoose.Schema({
