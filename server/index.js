@@ -201,6 +201,12 @@ app.get('/api/donations', (req, res) => {
   res.json({ donations: filtered });
 });
 
+app.get('/api/donations/:id', (req, res) => {
+  const donation = findDonation(req.params.id);
+  if (!donation) return res.status(404).json({ message: 'Donation not found.' });
+  res.json({ donation: normalizeDonation(donation) });
+});
+
 app.get('/api/donations/mine', requireAuth, requireRole('donor'), (req, res) => {
   const donations = getDonations()
     .filter((donation) => {

@@ -306,13 +306,16 @@ function App() {
         </div>
         <div className="nav-label">MENU</div>
         <nav className="side-nav" aria-label="Main navigation">
-          {navItems.map(({ id, label, icon: Icon, count }) => (
-            <button key={id} className={`nav-link ${activePage === id ? 'nav-active' : ''}`} onClick={() => navigate(id)}>
-              <Icon size={18} strokeWidth={1.9} />
-              <span>{label}</span>
-              {count && <span className="nav-count">{count}</span>}
-            </button>
-          ))}
+          {navItems.map(({ id, label, icon: Icon, count }) => {
+            const badge = id === 'marketplace' ? availableDonations.length : count;
+            return (
+              <button key={id} className={`nav-link ${activePage === id ? 'nav-active' : ''}`} onClick={() => navigate(id)}>
+                <Icon size={18} strokeWidth={1.9} />
+                <span>{label}</span>
+                {badge && <span className="nav-count">{badge}</span>}
+              </button>
+            );
+          })}
           {currentUser.role === 'admin' && <button className={`nav-link ${activePage === 'admin' ? 'nav-active' : ''}`} onClick={() => navigate('admin')}><ShieldAlert size={18} /><span>Admin</span></button>}
         </nav>
         <div className="sidebar-bottom">
