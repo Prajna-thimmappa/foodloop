@@ -13,7 +13,7 @@ import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { Donation, PickupVerification, Report, User } from './models.js';
-import { VALID_ROLES, isRegistrationRole, normalizeEmail, normalizeRole } from './roles.js';
+import { isRegistrationRole, normalizeEmail, normalizeRole } from './roles.js';
 
 const app = express();
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -317,7 +317,7 @@ async function connectDatabase() {
       console.log('MongoDB connected');
       return;
     } catch (error) {
-      if (isProduction) throw new Error('MongoDB connection failed. Check MONGODB_URI and database network access.');
+      if (isProduction) throw new Error('MongoDB connection failed. Check MONGODB_URI and database network access.', { cause: error });
       console.warn(`MongoDB connection failed: ${error.message}. Falling back to in-memory database for local development.`);
     }
   }
@@ -431,12 +431,23 @@ async function seedDatabase() {
 
 await mkdir(uploadsDirectory, { recursive: true });
 
-try {
-  await connectDatabase();
-  if (!isProduction) await seedDatabase();
-} catch (error) {
-  console.error(`Database setup failed: ${error.message}`);
-  process.exit(1);
+async function start() {
+  try {
+    await connectDatabase();
+    if (!isProduction) await seedDatabase();
+  } catch (error) {
+    console.error(`Database setup failed: ${error.message}`);
+    process.exit(1);
+  }
+
+  if (process.env.NODE_ENV !== 'test') {
+    app.listen(port, () => console.log(`FoodLoop API listening on http://localhost:${port}`));
+  }
 }
 
-app.listen(port, () => console.log(`FoodLoop API listening on http://localhost:${port}`));
+const isMain = import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  start();
+}
+
+export { app, start, connectDatabase, seedDatabase };

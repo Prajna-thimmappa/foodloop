@@ -2,29 +2,34 @@ import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import {
   ArrowRight,
-  BadgeCheck,
-  Bell,
-  CalendarDays,
-  Check,
   CheckCircle2,
   ChevronDown,
-  ChevronRight,
-  Clock3,
   Compass,
   HeartHandshake,
   Leaf,
-  MapPin,
-  Menu,
   PackageCheck,
-  Plus,
   Search,
   ShieldAlert,
-  Sparkles,
   Sprout,
+  Sparkles,
   Utensils,
-  UsersRound,
-  X,
 } from 'lucide-react';
+
+import Admin from './components/Admin.jsx';
+import AuthModal from './components/AuthModal.jsx';
+import ClaimedModal from './components/ClaimedModal.jsx';
+import DetailsModal from './components/DetailsModal.jsx';
+import DonationModal from './components/DonationModal.jsx';
+import DonorCodeModal from './components/DonorCodeModal.jsx';
+import Impact from './components/Impact.jsx';
+import InviteModal from './components/InviteModal.jsx';
+import Marketplace from './components/Marketplace.jsx';
+import MyListings from './components/MyListings.jsx';
+import Overview from './components/Overview.jsx';
+import Pickups from './components/Pickups.jsx';
+import ReportModal from './components/ReportModal.jsx';
+import Topbar from './components/Topbar.jsx';
+import VerifyModal from './components/VerifyModal.jsx';
 
 const apiBaseUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
 if (apiBaseUrl) {
@@ -39,7 +44,6 @@ const navItems = [
   { id: 'impact', label: 'Our impact', icon: Sprout },
 ];
 
-const categories = ['All food', 'Prepared meals', 'Produce', 'Bakery'];
 const fallbackFoodImage = 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=960&q=80';
 
 function readStorage(key, fallback) {
@@ -60,7 +64,10 @@ function App() {
   const [category, setCategory] = useState('All food');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('Recommended');
-  const [modal, setModal] = useState(null);
+  const [modal, setModal] = useState(() => {
+    const token = localStorage.getItem('foodloop-token');
+    return token ? null : { type: 'auth' };
+  });
   const [pendingClaim, setPendingClaim] = useState(null);
   const [toast, setToast] = useState('');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -76,7 +83,6 @@ function App() {
   useEffect(() => {
     const token = localStorage.getItem('foodloop-token');
     if (token) axios.defaults.headers.common.Authorization = `Bearer ${token}`;
-    else setModal({ type: 'auth' });
   }, []);
 
   useEffect(() => {
@@ -100,8 +106,10 @@ function App() {
   useEffect(() => {
     let active = true;
     if (!user) {
-      setMyPickups([]);
-      setMyListings([]);
+      setTimeout(() => {
+        setMyPickups([]);
+        setMyListings([]);
+      }, 0);
       return () => { active = false; };
     }
 
@@ -111,14 +119,14 @@ function App() {
         if (active) setMyPickups(data.donations || []);
       }).catch(() => { if (active) setMyPickups([]); }));
     } else {
-      setMyPickups([]);
+      setTimeout(() => setMyPickups([]), 0);
     }
     if (user.role === 'donor') {
       requests.push(axios.get('/api/donations/mine', { timeout: 4000 }).then(({ data }) => {
         if (active) setMyListings(data.donations || []);
       }).catch(() => { if (active) setMyListings([]); }));
     } else {
-      setMyListings([]);
+      setTimeout(() => setMyListings([]), 0);
     }
 
     return () => {
@@ -219,7 +227,7 @@ function App() {
   async function addDonation(formData) {
     const { photo, ...listingValues } = formData;
     try {
-      let image = listingValues.image || 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=960&q=80';
+      let image = listingValues.image || fallbackFoodImage;
       if (photo) {
         const uploadData = new FormData();
         uploadData.append('image', photo);
@@ -259,18 +267,6 @@ function App() {
     } catch (error) {
       announce(error.response?.data?.message || 'Sign in failed.');
     }
-  }
-
-  function startOfferFlow() {
-    if (!user) {
-      setModal({ type: 'auth' });
-      return;
-    }
-    if (!['donor', 'admin'].includes(user.role)) {
-      announce('Food listings can be posted by donor accounts.');
-      return;
-    }
-    setModal({ type: 'donation' });
   }
 
   async function submitReport(reportData) {
@@ -336,15 +332,7 @@ function App() {
       {mobileNavOpen && <button className="mobile-scrim" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
 
       <main className="main-area">
-        <header className="topbar">
-          <button className="icon-button mobile-menu" onClick={() => setMobileNavOpen(true)} aria-label="Open menu"><Menu size={20} /></button>
-          <div className="breadcrumb"><span>FoodLoop</span><ChevronRight size={14} /><strong>{navItems.find((item) => item.id === activePage)?.label || (activePage === 'admin' ? 'Admin' : 'Overview')}</strong></div>
-          <div className="topbar-actions">
-            <div className="location-pill"><MapPin size={15} /><span>Bengaluru</span><ChevronDown size={13} /></div>
-            <button className="icon-button notification-button" aria-label="Notifications" onClick={() => announce('You’re all caught up.') }><Bell size={18} /><i /></button>
-            <button className="offer-button" aria-label="Offer food" onClick={startOfferFlow}><Plus size={17} /><span>Offer food</span></button>
-          </div>
-        </header>
+        <Topbar mobileNavOpen={mobileNavOpen} setMobileNavOpen={setMobileNavOpen} activePage={activePage} navItems={navItems} announce={announce} user={currentUser} navigate={navigate} />
 
         <div className="page-content">
           <section className="welcome-row">
@@ -367,6 +355,7 @@ function App() {
             claimDonation={claimDonation}
             setCategory={setCategory}
             category={category}
+            fallbackFoodImage={fallbackFoodImage}
           />}
           {activePage === 'marketplace' && <Marketplace
             donations={filteredDonations}
@@ -379,7 +368,7 @@ function App() {
             claimDonation={claimDonation}
             setModal={setModal}
           />}
-          {activePage === 'pickups' && <Pickups donations={myPickups} navigate={navigate} verifyPickup={(donation) => setModal({ type: 'verify', donation })} />}
+          {activePage === 'pickups' && <Pickups donations={myPickups} navigate={navigate} verifyPickup={(donation) => setModal({ type: 'verify', donation })} fallbackFoodImage={fallbackFoodImage} />}
           {activePage === 'my-listings' && <MyListings donations={myListings} user={currentUser} setModal={setModal} />}
           {activePage === 'impact' && <Impact mealCount={mealCount} completedPickups={communityStats.completedPickups} partnerCount={communityStats.partners} />}
           {activePage === 'admin' && <Admin donations={donations} users={currentUser} />}
@@ -397,156 +386,6 @@ function App() {
       {toast && <div className="toast"><CheckCircle2 size={18} />{toast}</div>}
     </div>
   );
-}
-
-function Overview({ availableDonations, filteredDonations, mealCount, partnerCount, nextPickup, user, navigate, setModal, claimDonation, setCategory, category }) {
-  return (
-    <>
-      <section className="metrics-grid">
-        <article className="metric-card metric-primary"><div className="metric-top"><span>MEALS REDIRECTED</span><span className="metric-icon"><Utensils size={16} /></span></div><div className="metric-value">{mealCount.toLocaleString()}<span className="metric-unit"> meals</span></div><div className="metric-foot"><span className="metric-caption">Confirmed food handoffs</span></div></article>
-        <article className="metric-card"><div className="metric-top"><span>AVAILABLE LISTINGS</span><span className="metric-icon metric-icon-orange"><PackageCheck size={16} /></span></div><div className="metric-value">{availableDonations.length}<span className="metric-unit"> listings</span></div><div className="metric-foot"><span className="metric-caption"><span className="tiny-dot" /> Currently open</span><button className="text-action" onClick={() => navigate('marketplace')}>Browse <ArrowRight size={14} /></button></div></article>
-        <article className="metric-card"><div className="metric-top"><span>COMMUNITY PARTNERS</span><span className="metric-icon metric-icon-blue"><UsersRound size={16} /></span></div><div className="metric-value">{partnerCount}<span className="metric-unit"> registered</span></div><div className="metric-foot"><span className="metric-caption">donors and community partners</span></div></article>
-      </section>
-
-      <section className="content-grid">
-        <div className="listings-panel">
-          <div className="section-heading"><div><div className="section-kicker">FRESH FROM YOUR NEIGHBORHOOD</div><h2>Food worth finding</h2></div><button className="text-action" onClick={() => navigate('marketplace')}>See all <ArrowRight size={15} /></button></div>
-          <div className="category-row compact-categories">{categories.map((item) => <button key={item} className={`category-chip ${category === item ? 'chip-active' : ''}`} onClick={() => setCategory(item)}>{item}</button>)}</div>
-          <div className="food-grid overview-food-grid">{filteredDonations.slice(0, 3).map((donation) => <FoodCard key={donation.id} donation={donation} onClaim={claimDonation} onDetails={() => setModal({ type: 'details', donation })} />)}</div>
-          {filteredDonations.length === 0 && <EmptyState title="Nothing on the table yet" text="Try another category or check back soon." />}
-        </div>
-        <aside className="right-rail">
-          <div className="pickup-panel"><div className="rail-heading"><div><div className="section-kicker">YOUR NEXT GOOD DEED</div><h3>{nextPickup ? 'Coming up' : 'No pickup yet'}</h3></div><button className="more-button" aria-label="See pickups" onClick={() => navigate('pickups')}><ArrowRight size={17} /></button></div>{nextPickup ? <><div className="pickup-feature-image"><img src={nextPickup.image || fallbackFoodImage} alt={nextPickup.name} /><span className="pickup-image-badge"><Clock3 size={12} /> BY {nextPickup.expiresIn?.toUpperCase() || 'TODAY'}</span></div><div className="pickup-feature-body"><div className="pickup-feature-title"><h4>{nextPickup.name}</h4><span className="status-badge status-claimed">Claimed</span></div><p><MapPin size={14} /> {nextPickup.location}</p><div className="pickup-divider" /><div className="pickup-meta"><span><Utensils size={14} /> {nextPickup.quantity}</span><span>{nextPickup.donor}</span></div><button className="outline-action" onClick={() => navigate(user?.role === 'donor' ? 'my-listings' : 'pickups')}>View pickup details <ArrowRight size={15} /></button></div></> : <div className="pickup-feature-body"><p>No active pickup is linked to this account.</p><button className="outline-action" onClick={() => navigate(user?.role === 'donor' ? 'my-listings' : 'marketplace')}>{user?.role === 'donor' ? 'Manage listings' : 'Browse available food'} <ArrowRight size={15} /></button></div>}</div>
-          <div className="community-banner"><div className="community-icon"><HeartHandshake size={19} /></div><div><strong>Pass it around</strong><p>Invite a local kitchen to join your neighborhood loop.</p><button onClick={() => setModal({ type: 'invite' })}>Invite a partner <ArrowRight size={14} /></button></div><span className="banner-sparkle">✳</span></div>
-        </aside>
-      </section>
-    </>
-  );
-}
-
-function Marketplace({ donations, category, setCategory, search, setSearch, sortBy, setSortBy, claimDonation, setModal }) {
-  return (
-    <section className="marketplace-page">
-      <div className="marketplace-controls"><label className="search-box"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search food, kitchens, or area" /><kbd>⌘ K</kbd></label><label className="sort-button">Sort:<select value={sortBy} onChange={(event) => setSortBy(event.target.value)} aria-label="Sort listings"><option>Recommended</option><option>Most servings</option></select><ChevronDown size={15} /></label></div>
-      <div className="marketplace-subrow"><div className="category-row">{categories.map((item) => <button key={item} className={`category-chip ${category === item ? 'chip-active' : ''}`} onClick={() => setCategory(item)}>{item}</button>)}</div><span className="result-count">{donations.length} available listings</span></div>
-      <div className="food-grid marketplace-food-grid">{donations.map((donation) => <FoodCard key={donation.id} donation={donation} onClaim={claimDonation} onDetails={() => setModal({ type: 'details', donation })} />)}</div>
-      {donations.length === 0 && <EmptyState title="No matches just yet" text="Try a different search or category." />}
-    </section>
-  );
-}
-
-function FoodCard({ donation, onClaim, onDetails }) {
-  const [saved, setSaved] = useState(false);
-  return (
-    <article className="food-card">
-      <div className="food-image-button" role="button" tabIndex={0} onClick={onDetails} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onDetails(); }} aria-label={`View ${donation.name}`}><img className="food-image" src={donation.image || fallbackFoodImage} alt={donation.name} /><span className="image-category">{donation.category}</span><button className={`save-button ${saved ? 'saved' : ''}`} onClick={(event) => { event.stopPropagation(); setSaved(!saved); }} aria-label={saved ? 'Remove saved food' : 'Save food'}>{saved ? <Check size={16} /> : <HeartHandshake size={16} />}</button></div>
-      <div className="food-card-content"><div className="food-donor"><span className="donor-monogram">{donation.donor?.[0] || 'F'}</span><span>{donation.donor || 'FoodLoop partner'}</span><BadgeCheck size={14} className="verified-icon" /></div><button className="food-title-button" onClick={onDetails}><h3>{donation.name}</h3></button><div className="food-card-info"><span><Utensils size={14} />{donation.quantity}</span><span><MapPin size={14} />{donation.location || 'Pickup location provided'}</span></div><div className="food-card-bottom"><span className="expiry-label"><Clock3 size={13} /> Pickup by {donation.expiresIn || 'Today'}</span><button className="claim-button" onClick={() => onClaim(donation)}>Claim <ArrowRight size={14} /></button></div></div>
-    </article>
-  );
-}
-
-function Pickups({ donations, navigate, verifyPickup }) {
-  return <section className="simple-page"><div className="section-heading"><div><div className="section-kicker">THE LAST MILE MATTERS</div><h2>Pickups in your care</h2></div><span className="result-count">{donations.length} total</span></div>{donations.length ? <div className="pickup-list">{donations.map((item) => <article className="pickup-row" key={item.id}><img src={item.image || fallbackFoodImage} alt="" /><div className="pickup-row-main"><span className={`status-badge ${item.status === 'collected' ? 'status-collected' : 'status-claimed'}`}>{item.status === 'collected' ? 'Collected' : 'Ready for pickup'}</span><h3>{item.name}</h3><p>{item.donor} <span>·</span> {item.quantity}</p><small><MapPin size={13} /> {item.location}</small></div><div className="pickup-row-side"><span><Clock3 size={14} /> {item.expiresIn}</span>{item.status !== 'collected' && <button className="claim-button" onClick={() => verifyPickup(item)}>Verify pickup <ArrowRight size={14} /></button>}</div></article>)}</div> : <EmptyState title="Your next pickup starts here" text="Find a listing and claim food for your community." action="Browse available food" onAction={() => navigate('marketplace')} />}</section>;
-}
-
-function MyListings({ donations, user, setModal }) {
-  if (user.role !== 'donor') return <EmptyState title="Donor workspace" text="Register as a food donor to manage your kitchen’s listings and pickup handoffs." />;
-  return <section className="simple-page"><div className="section-heading"><div><div className="section-kicker">YOUR KITCHEN’S CONTRIBUTION</div><h2>My food listings</h2></div><span className="result-count">{donations.length} total</span></div>{donations.length ? <div className="pickup-list">{donations.map((item) => <article className="pickup-row" key={item.id}><img src={item.image || fallbackFoodImage} alt="" /><div className="pickup-row-main"><span className={`status-badge ${item.status === 'available' ? 'status-available' : item.status === 'collected' ? 'status-collected' : 'status-claimed'}`}>{item.status}</span><h3>{item.name}</h3><p>{item.quantity} <span>·</span> Pickup by {item.expiresIn}</p>{item.claimedBy && <small><HeartHandshake size={13} /> Claimed by {item.claimedBy}</small>}</div><div className="pickup-row-side">{item.status === 'claimed' && <button className="claim-button" onClick={() => setModal({ type: 'donor-code', donation: item })}>Share pickup code <ArrowRight size={14} /></button>}</div></article>)}</div> : <EmptyState title="Your first listing starts here" text="Post surplus food and connect with nearby community partners." />}</section>;
-}
-
-function Impact({ mealCount, completedPickups, partnerCount }) {
-  return <section className="impact-page"><div className="impact-hero"><div className="impact-hero-copy"><span className="impact-hero-mark"><Sprout size={19} /> YOUR NEIGHBORHOOD IN MOTION</span><h2>Good food is too good to waste.</h2><p>Every pickup keeps nourishing food in the community and out of the bin. Here’s the good your local loop is doing.</p></div><div className="impact-hero-number"><strong>{mealCount.toLocaleString()}</strong><span>meals redirected<br />and counting</span></div></div><div className="impact-stat-grid"><article><span className="impact-stat-icon green"><Utensils size={18} /></span><strong>{mealCount.toLocaleString()}</strong><span>meals shared</span><small>From confirmed pickups</small></article><article><span className="impact-stat-icon orange"><PackageCheck size={18} /></span><strong>{completedPickups}</strong><span>successful pickups</span><small>Confirmed handoffs</small></article><article><span className="impact-stat-icon blue"><UsersRound size={18} /></span><strong>{partnerCount}</strong><span>community partners</span><small>Registered donors and partners</small></article></div><div className="impact-footnote"><Leaf size={17} /><p>Meal counts include only listings confirmed as collected. FoodLoop avoids estimating waste impact until portion weights are available.</p></div></section>;
-}
-
-function Admin({ donations, users }) {
-  const [stats, setStats] = useState({ users: 0, donors: 0, ngos: 0, available: 0, claimed: 0, collected: 0, openReports: 0 });
-
-  useEffect(() => {
-    if (users.role !== 'admin') return;
-    axios.get('/api/admin/stats', { timeout: 2500 })
-      .then(({ data }) => setStats(data))
-      .catch(() => setStats({ users: 0, donors: 0, ngos: 0, available: 0, claimed: 0, collected: 0, openReports: 0 }));
-  }, [users.role]);
-
-  if (users.role !== 'admin') return <EmptyState title="Admin access required" text="Switch to an administrator account to view platform reports." />;
-  const claimed = donations.filter((item) => item.status === 'claimed').length;
-  return <section className="simple-page"><div className="section-heading"><div><div className="section-kicker">PLATFORM HEALTH</div><h2>Keeping the loop healthy</h2></div></div><div className="admin-stats"><article><span>Total members</span><strong>{stats.users || 0}</strong><small>{stats.donors || 0} donors · {stats.ngos || 0} NGOs</small></article><article><span>Active listings</span><strong>{stats.available || donations.filter((item) => item.status === 'available').length}</strong><small>Live food posted today</small></article><article><span>Awaiting pickup</span><strong>{stats.claimed || claimed}</strong><small>Keep an eye on these</small></article><article><span>Meals redirected</span><strong>{stats.collected || donations.filter((item) => item.status === 'collected').reduce((total, item) => total + Number(item.servings || 0), 0)}</strong><small>From confirmed pickups</small></article></div><div className="admin-table-wrap"><div className="table-heading"><h3>Recent listings</h3><span>Live moderation queue</span></div><table><thead><tr><th>LISTING</th><th>DONOR</th><th>STATUS</th><th>QUANTITY</th></tr></thead><tbody>{donations.slice(0, 5).map((item) => <tr key={item.id}><td>{item.name}</td><td>{item.donor}</td><td><span className={`status-badge ${item.status === 'available' ? 'status-available' : 'status-claimed'}`}>{item.status}</span></td><td>{item.quantity}</td></tr>)}</tbody></table></div></section>;
-}
-
-function EmptyState({ title, text, action, onAction }) {
-  return <div className="empty-state"><span><Sprout size={21} /></span><h3>{title}</h3><p>{text}</p>{action && <button className="text-action" onClick={onAction}>{action} <ArrowRight size={14} /></button>}</div>;
-}
-
-function DonationModal({ onClose, onSubmit }) {
-  const [preview, setPreview] = useState('');
-  const [values, setValues] = useState({ name: '', quantity: '', category: 'Prepared meals', location: '', expiresIn: '', description: '', dietary: 'No preference' });
-  function update(event) { setValues((current) => ({ ...current, [event.target.name]: event.target.value })); }
-  function selectImage(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setPreview(String(reader.result));
-    reader.readAsDataURL(file);
-  }
-  function submit(event) {
-    event.preventDefault();
-    onSubmit({ ...values, photo: event.currentTarget.elements.photo.files[0] || null, image: preview || 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=960&q=80' });
-  }
-  return <Modal title="Give good food another home" subtitle="A few details help the right neighbor find your donation." onClose={onClose}><form className="modal-form" onSubmit={submit}><label className={`upload-field ${preview ? 'has-preview' : ''}`}>{preview ? <img src={preview} alt="Donation preview" /> : <span className="upload-placeholder"><Plus size={20} /><strong>Add a food photo</strong><small>A clear photo helps partners decide</small></span>}<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectImage} /></label><div className="form-grid"><label>Food name<input name="name" value={values.name} onChange={update} placeholder="e.g. Vegetable rice bowls" required /></label><label>Quantity<input name="quantity" value={values.quantity} onChange={update} placeholder="e.g. 12 meals" required /></label><label>Category<select name="category" value={values.category} onChange={update}><option>Prepared meals</option><option>Produce</option><option>Bakery</option><option>Dairy</option></select></label><label>Pickup location<input name="location" value={values.location} onChange={update} placeholder="Area or street address" required /></label><label>Pickup by<input type="datetime-local" name="expiresIn" value={values.expiresIn} onChange={update} required /></label><label>Dietary info<select name="dietary" value={values.dietary} onChange={update}><option>No preference</option><option>Vegetarian</option><option>Vegan</option><option>Contains gluten</option><option>Contains dairy</option></select></label></div><label>Description<textarea name="description" value={values.description} onChange={update} placeholder="What should a community partner know?" rows="3" /></label><div className="modal-actions"><button type="button" className="cancel-button" onClick={onClose}>Cancel</button><button type="submit" className="offer-button"><Plus size={16} /> Publish listing</button></div></form></Modal>;
-}
-
-function VerifyModal({ donation, onClose, onSubmit }) {
-  const [code, setCode] = useState('');
-  return <Modal title="Confirm this pickup" subtitle={`${donation.name} · ${donation.donor}`} onClose={onClose}><form className="verify-form" onSubmit={(event) => { event.preventDefault(); onSubmit(donation, code); }}><div className="otp-illustration"><PackageCheck size={27} /></div><p>Ask the donor for their 6-digit handoff code to confirm the food has been collected.</p>{donation.pickupCode && <div className="demo-code-note"><span>PICKUP CODE</span><strong>{donation.pickupCode}</strong></div>}<input className="otp-input" value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="······" aria-label="6 digit pickup code" required minLength="6" maxLength="6" /><button className="offer-button verify-submit" disabled={code.length !== 6}><CheckCircle2 size={17} /> Confirm collection</button></form></Modal>;
-}
-
-function ClaimedModal({ donation, onClose }) {
-  return <Modal title="You’ve got it." subtitle="One less meal wasted, one more person nourished." onClose={onClose}><div className="claim-confirmation"><span className="success-check"><Check size={25} /></span><div className="claimed-summary"><img src={donation.image || fallbackFoodImage} alt="" /><div><strong>{donation.name}</strong><span>{donation.quantity} · {donation.donor}</span></div></div><div className="pickup-instructions"><span><MapPin size={16} /> PICKUP AT</span><strong>{donation.location}</strong><span><CalendarDays size={16} /> BEFORE {donation.expiresIn?.toUpperCase()}</span></div>{donation.pickupCode && <div className="demo-code-note"><span>PICKUP CODE</span><strong>{donation.pickupCode}</strong></div>}<button className="offer-button full-button" onClick={onClose}>View pickup details <ArrowRight size={16} /></button></div></Modal>;
-}
-
-function DonorCodeModal({ donation, onClose }) {
-  const [pickupCode, setPickupCode] = useState('');
-  const [error, setError] = useState('');
-  useEffect(() => {
-    let active = true;
-    axios.post(`/api/donations/${donation.id}/pickup-code`, {}, { timeout: 3000 })
-      .then(({ data }) => { if (active) setPickupCode(data.pickupCode); })
-      .catch((requestError) => { if (active) setError(requestError.response?.data?.message || 'Could not load a pickup code.'); });
-    return () => { active = false; };
-  }, [donation]);
-  return <Modal title="Pickup handoff code" subtitle={`${donation.name} · claimed by ${donation.claimedBy || 'your community partner'}`} onClose={onClose}><div className="verify-form"><div className="otp-illustration"><ShieldAlert size={25} /></div><p>Share this code with the collector at the food handoff. It confirms the pickup is complete.</p>{error ? <p className="error-message">{error}</p> : <div className="donor-pickup-code">{pickupCode || '------'}</div>}<button className="offer-button verify-submit" disabled={!pickupCode} onClick={() => { navigator.clipboard?.writeText(pickupCode); onClose(); }}>Copy code <Check size={16} /></button></div></Modal>;
-}
-
-function AuthModal({ user, onClose, onSubmit }) {
-  const [mode, setMode] = useState('login');
-  const [role, setRole] = useState(user?.role && user.role !== 'admin' ? user.role : 'ngo');
-  function submit(event) {
-    event.preventDefault();
-    const formData = Object.fromEntries(new FormData(event.currentTarget).entries());
-    formData.mode = mode;
-    formData.role = role;
-    onSubmit(formData);
-  }
-  return <Modal title={mode === 'login' ? 'Welcome back' : 'Join the neighborhood'} subtitle="Be part of a kinder, less wasteful food system." onClose={onClose}><form className="modal-form auth-form" onSubmit={submit}>{mode === 'register' && <><label>Your name<input name="name" placeholder="Name" required /></label><label>Organization<input name="organization" placeholder="Kitchen, NGO, or community group" /></label><div className="role-picker"><span>I’m here as a</span>{[['ngo', 'NGO'], ['volunteer', 'Volunteer'], ['donor', 'Food donor']].map(([value, label]) => <button type="button" key={value} className={role === value ? 'role-selected' : ''} onClick={() => setRole(value)}>{label}</button>)}</div></>}<label>Email address<input name="email" type="email" placeholder="you@example.org" required /></label><label>Password<input name="password" type="password" placeholder="At least 8 characters" minLength="8" required /></label><button type="submit" className="offer-button full-button">{mode === 'login' ? 'Log in' : 'Create account'} <ArrowRight size={16} /></button><p className="auth-switch">{mode === 'login' ? 'New to FoodLoop?' : 'Already part of the loop?'} <button type="button" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>{mode === 'login' ? 'Create an account' : 'Log in'}</button></p></form></Modal>;
-}
-
-function DetailsModal({ donation, onClose, onClaim, onReport }) {
-  return <Modal title={donation.name} subtitle={`${donation.donor} · ${donation.category}`} onClose={onClose}><div className="details-modal"><img src={donation.image || fallbackFoodImage} alt={donation.name} /><div className="details-meta"><span><Utensils size={15} /> {donation.quantity}</span><span><MapPin size={15} /> {donation.location}</span><span><Clock3 size={15} /> Pickup by {donation.expiresIn}</span><span><Leaf size={15} /> {donation.dietary || 'Ask donor about dietary details'}</span></div><p>{donation.description || 'Freshly prepared and ready for a new home. Coordinate pickup directly with the donor after claiming.'}</p><div className="details-actions"><button className="cancel-button report-button" onClick={onReport}><ShieldAlert size={14} /> Report listing</button><button className="offer-button" onClick={onClaim}>Claim this food <ArrowRight size={15} /></button></div></div></Modal>;
-}
-
-function ReportModal({ donation, onClose, onSubmit }) {
-  const [reason, setReason] = useState('Unsafe food');
-  const [details, setDetails] = useState('');
-  return <Modal title="Report this listing" subtitle={`Help us review “${donation.name}”.`} onClose={onClose}><form className="modal-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ donationId: donation.id, reason, details }); }}><label>What should we review?<select value={reason} onChange={(event) => setReason(event.target.value)}><option>Unsafe food</option><option>Incorrect details</option><option>Suspicious listing</option><option>Other</option></select></label><label>Additional details<textarea value={details} onChange={(event) => setDetails(event.target.value)} placeholder="Share what you noticed" rows="4" /></label><div className="modal-actions"><button className="cancel-button" type="button" onClick={onClose}>Cancel</button><button className="offer-button" type="submit"><ShieldAlert size={15} /> Send report</button></div></form></Modal>;
-}
-
-function InviteModal({ onClose, onSubmit }) {
-  const [email, setEmail] = useState('');
-  return <Modal title="Bring a partner into the loop" subtitle="A good neighbor can make a big difference." onClose={onClose}><form className="modal-form" onSubmit={(event) => { event.preventDefault(); onSubmit(email); }}><label>Partner email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="hello@local-kitchen.org" required /></label><div className="invite-note"><HeartHandshake size={17} /><span>We’ll prepare a FoodLoop invitation they can use to join your neighborhood.</span></div><div className="modal-actions"><button className="cancel-button" type="button" onClick={onClose}>Cancel</button><button className="offer-button" type="submit">Prepare invitation <ArrowRight size={15} /></button></div></form></Modal>;
-}
-
-function Modal({ title, subtitle, onClose, children }) {
-  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="modal" role="dialog" aria-modal="true" aria-label={title}><div className="modal-heading"><div><div className="section-kicker">FOODLOOP COMMUNITY</div><h2>{title}</h2><p>{subtitle}</p></div><button className="icon-button modal-close" onClick={onClose} aria-label="Close"><X size={19} /></button></div>{children}</section></div>;
 }
 
 export default App;
