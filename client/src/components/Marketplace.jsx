@@ -2,8 +2,9 @@ import { Search, ChevronDown } from 'lucide-react';
 import FoodCard from './FoodCard.jsx';
 import EmptyState from './EmptyState.jsx';
 
-function Marketplace({ donations, category, setCategory, search, setSearch, sortBy, setSortBy, claimDonation, setModal }) {
+function Marketplace({ donations, category, setCategory, search, setSearch, sortBy, setSortBy, claimDonation, setModal, listingsRefreshedAt }) {
   const categories = ['All food', 'Prepared meals', 'Produce', 'Bakery'];
+  const refreshedText = listingsRefreshedAt ? `Listings refreshed ${new Date(listingsRefreshedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : null;
   return (
     <section className="marketplace-page">
       <div className="marketplace-controls">
@@ -29,6 +30,7 @@ function Marketplace({ donations, category, setCategory, search, setSearch, sort
           ))}
         </div>
         <span className="result-count">{donations.length} available listings</span>
+        {refreshedText && <span className="result-count">{refreshedText}</span>}
       </div>
       <div className="food-grid marketplace-food-grid">
         {donations.map((donation) => (

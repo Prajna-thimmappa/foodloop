@@ -60,6 +60,7 @@ function App() {
   const [myPickups, setMyPickups] = useState([]);
   const [myListings, setMyListings] = useState([]);
   const [communityStats, setCommunityStats] = useState({ mealsRedirected: 0, completedPickups: 0, partners: 0 });
+  const [listingsRefreshedAt, setListingsRefreshedAt] = useState(null);
   const [activePage, setActivePage] = useState('overview');
   const [category, setCategory] = useState('All food');
   const [search, setSearch] = useState('');
@@ -89,7 +90,10 @@ function App() {
     let active = true;
     axios.get('/api/donations', { timeout: 2500 })
       .then(({ data }) => {
-        if (active && Array.isArray(data.donations)) setDonations(data.donations);
+        if (active && Array.isArray(data.donations)) {
+          setDonations(data.donations);
+          setListingsRefreshedAt(new Date());
+        }
       })
       .catch(() => {});
     return () => { active = false; };
@@ -367,6 +371,7 @@ function App() {
             setSortBy={setSortBy}
             claimDonation={claimDonation}
             setModal={setModal}
+            listingsRefreshedAt={listingsRefreshedAt}
           />}
           {activePage === 'pickups' && <Pickups donations={myPickups} navigate={navigate} verifyPickup={(donation) => setModal({ type: 'verify', donation })} fallbackFoodImage={fallbackFoodImage} />}
           {activePage === 'my-listings' && <MyListings donations={myListings} user={currentUser} setModal={setModal} />}
