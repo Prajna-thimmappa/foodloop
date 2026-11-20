@@ -184,6 +184,16 @@ app.get('/api/donations', async (request, response, next) => {
   } catch (error) { next(error); }
 });
 
+app.get('/api/donations/:id', async (request, response, next) => {
+  try {
+    const donation = await Donation.findById(request.params.id)
+      .populate('donor', 'name organization')
+      .populate('claimedBy', 'name organization');
+    if (!donation) return response.status(404).json({ message: 'Donation not found.' });
+    response.json({ donation: serializeDonation(donation) });
+  } catch (error) { next(error); }
+});
+
 app.get('/api/donations/mine', requireDatabase, authenticate, allowRoles('donor'), async (request, response, next) => {
   try {
     const donations = await Donation.find({ donor: request.user.id })
