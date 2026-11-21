@@ -1,13 +1,21 @@
-import { ArrowRight, Check, Clock3, HeartHandshake, MapPin, Utensils } from 'lucide-react';
+import { ArrowRight, Check, Clock3, HeartHandshake, MapPin, Sparkles, Utensils } from 'lucide-react';
 import { useState } from 'react';
+
+function isFresh(posted) {
+  if (!posted) return false;
+  const postedTime = new Date(posted).getTime();
+  return Number.isFinite(postedTime) && Date.now() - postedTime < 24 * 60 * 60 * 1000;
+}
 
 function FoodCard({ donation, onClaim, onDetails, fallbackFoodImage }) {
   const [saved, setSaved] = useState(false);
+  const fresh = isFresh(donation.posted);
   return (
-    <article className="food-card">
+    <article className={`food-card ${fresh ? 'food-card-fresh' : ''}`}>
       <div className="food-image-button" role="button" tabIndex={0} onClick={onDetails} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onDetails(); }} aria-label={`View ${donation.name}`}>
         <img className="food-image" src={donation.image || fallbackFoodImage} alt={donation.name} />
         <span className="image-category">{donation.category}</span>
+        {fresh && <span className="fresh-badge"><Sparkles size={11} /> Fresh</span>}
         <button className={`save-button ${saved ? 'saved' : ''}`} onClick={(event) => { event.stopPropagation(); setSaved(!saved); }} aria-label={saved ? 'Remove saved food' : 'Save food'}>
           {saved ? <Check size={16} /> : <HeartHandshake size={16} />}
         </button>
