@@ -32,6 +32,7 @@ function FoodCard({ donation, onClaim, onDetails, fallbackFoodImage }) {
           <span><Utensils size={14} />{donation.quantity}</span>
           <span><MapPin size={14} />{donation.location || 'Pickup location provided'}</span>
         </div>
+        <div className="servings-dots">{Array.from({ length: Math.max(1, Math.min(5, Number(donation.servings || 1))) }, (_, i) => <span key={i} className="serving-dot" />)}</div>
         <div className="food-card-bottom">
           <span className="expiry-label"><Clock3 size={13} /> Pickup by {donation.expiresIn || 'Today'}</span>
           <button className="claim-button" onClick={() => onClaim(donation)}>Claim <ArrowRight size={14} /></button>
