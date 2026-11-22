@@ -318,6 +318,7 @@ td { color: #4f5f54; }tbody tr:last-child td { border-bottom: 0; }
 .auth-form { gap: 12px; }
 .role-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: #77847a; font-size: 10px; }
 .role-picker > span { width: 100%; margin-bottom: 1px; }
+.role-picker-selected { display: grid; width: 30px; height: 30px; place-items: center; color: var(--forest); background: #eaf2e8; border: 1px solid #cfe0ce; border-radius: 7px; font-size: 11px; }
 .role-picker button { padding: 7px 9px; color: #718077; background: #fff; border: 1px solid #e2e7df; border-radius: 5px; font-size: 9px; }
 .role-picker button.role-selected { color: var(--forest); background: #eaf2e8; border-color: #cfe0ce; }
 .auth-switch { margin: 0; color: #87928a; font-size: 10px; text-align: center; }
