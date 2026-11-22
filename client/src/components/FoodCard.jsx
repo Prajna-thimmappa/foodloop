@@ -33,6 +33,7 @@ function FoodCard({ donation, onClaim, onDetails, fallbackFoodImage }) {
         <div className="food-card-info">
           <span><Utensils size={14} />{donation.quantity}</span>
           <span><MapPin size={14} />{donation.location || 'Pickup location provided'}</span>
+          {claimed && donation.claimedBy && <span className="claimed-by"><UsersRound size={11} strokeWidth={2} /> Claimed by {donation.claimedBy}</span>}
         </div>
         <div className="servings-dots">{Array.from({ length: Math.max(1, Math.min(5, Number(donation.servings || 1))) }, (_, i) => <span key={i} className="serving-dot" />)}</div>
         <div className="food-card-bottom">
