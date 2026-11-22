@@ -1,4 +1,4 @@
-import { ArrowRight, Check, Clock3, HeartHandshake, MapPin, Sparkles, Utensils } from 'lucide-react';
+import { ArrowRight, Check, Clock3, HeartHandshake, MapPin, Sparkles, UsersRound, Utensils } from 'lucide-react';
 import { useState } from 'react';
 
 function isFresh(posted) {
