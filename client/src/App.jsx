@@ -336,7 +336,7 @@ function App() {
       {mobileNavOpen && <button className="mobile-scrim" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)} />}
 
       <main className="main-area">
-        <Topbar mobileNavOpen={mobileNavOpen} setMobileNavOpen={setMobileNavOpen} activePage={activePage} navItems={navItems} announce={announce} user={currentUser} navigate={navigate} />
+        <Topbar mobileNavOpen={mobileNavOpen} setMobileNavOpen={setMobileNavOpen} activePage={activePage} navItems={navItems} announce={announce} user={currentUser} setModal={setModal} navigate={navigate} />
 
         <div className="page-content">
           <section className="welcome-row">

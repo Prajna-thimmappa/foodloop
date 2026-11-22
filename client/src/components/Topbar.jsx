@@ -1,7 +1,8 @@
-import { Bell, ChevronDown, ChevronRight, MapPin, Menu, Plus } from 'lucide-react';
+import { Bell, ChevronDown, ChevronRight, MapPin, Menu, Plus, UserRound } from 'lucide-react';
 
-function Topbar({ setMobileNavOpen, activePage, navItems, announce, navigate }) {
+function Topbar({ setMobileNavOpen, activePage, navItems, announce, user, navigate }) {
   const pageLabel = navItems.find((item) => item.id === activePage)?.label || (activePage === 'admin' ? 'Admin' : 'Overview');
+  const initials = user?.name ? user.name.split(' ').map((part) => part[0]).slice(0, 2).join('') : 'FL';
   return (
     <header className="topbar">
       <button className="icon-button mobile-menu" onClick={() => setMobileNavOpen(true)} aria-label="Open menu">
@@ -22,6 +23,11 @@ function Topbar({ setMobileNavOpen, activePage, navItems, announce, navigate }) 
           <Bell size={18} />
           <i />
         </button>
+        <div className="profile-trigger" onClick={() => setModal({ type: 'auth' })}>
+          <div className="profile-avatar-small">{initials}</div>
+          <span className="profile-name-small">{user?.name || 'Guest'}</span>
+          <ChevronDown size={12} className="muted-icon" />
+        </div>
         <button className="offer-button" aria-label="Offer food" onClick={() => navigate('marketplace')}>
           <Plus size={17} />
           <span>Offer food</span>
