@@ -1,10 +1,13 @@
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, UsersRound, HeartHandshake, Utensils } from 'lucide-react';
 import { useState } from 'react';
 import Modal from './Modal.jsx';
+
+const ROLE_ICONS = { ngo: UsersRound, volunteer: HeartHandshake, donor: Utensils };
 
 function AuthModal({ user, onClose, onSubmit }) {
   const [mode, setMode] = useState('login');
   const [role, setRole] = useState(user?.role && user.role !== 'admin' ? user.role : 'ngo');
+  const RoleIcon = ROLE_ICONS[role] || UsersRound;
   function submit(event) {
     event.preventDefault();
     const formData = Object.fromEntries(new FormData(event.currentTarget).entries());
@@ -21,8 +24,9 @@ function AuthModal({ user, onClose, onSubmit }) {
             <label>Organization<input name="organization" placeholder="Kitchen, NGO, or community group" /></label>
             <div className="role-picker">
               <span>I’m here as a</span>
+              <div className="role-picker-selected"><RoleIcon size={13} strokeWidth={2} /></div>
               {[['ngo', 'NGO'], ['volunteer', 'Volunteer'], ['donor', 'Food donor']].map(([value, label]) => (
-                <button type="button" key={value} className={role === value ? 'role-selected' : ''} onClick={() => setRole(value)}>{label}</button>
+                <button type="button" key={value} className={role === value ? 'role-selected' : ''} onClick={() => setRole(value)} aria-pressed={role === value}>{label}</button>
               ))}
             </div>
           </>
